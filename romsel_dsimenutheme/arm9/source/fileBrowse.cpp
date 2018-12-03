@@ -738,8 +738,13 @@ string browseForFile(const vector<string> extensionList, const char* username)
 						snprintf (boxArtPath[i], sizeof(boxArtPath[i]), "/_nds/TWiLightMenu/boxart/%s.bmp", dirContents[scrn].at(i+pagenum[secondaryDevice]*40).name.c_str());
 						if (!access(boxArtPath[i], F_OK)) {
 						} else if (bnrRomType[i] == 0) {
+							bool isLauncharg = ((std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "launcharg")
+											|| (std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "LAUNCHARG"));
+
 							if((std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "argv")
-							|| (std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "launcharg"))
+							|| (std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "ARGV")
+							|| (std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "launcharg")
+							|| (std_romsel_filename.substr(std_romsel_filename.find_last_of(".") + 1) == "LAUNCHARG"))
 							{
 								vector<char*> argarray;
 
@@ -764,6 +769,22 @@ string browseForFile(const vector<string> extensionList, const char* username)
 								std_romsel_filename = argarray.at(0);
 							}
 							// Get game's TID
+							if (isLauncharg) {
+								char appPath[256];
+								for (u8 appVer = 0; appVer <= 0xFF; appVer++)
+								{
+									if (appVer > 0xF) {
+										snprintf(appPath, sizeof(appPath), "%scontent/000000%x.app", std_romsel_filename.c_str(), appVer);
+									} else {
+										snprintf(appPath, sizeof(appPath), "%scontent/0000000%x.app", std_romsel_filename.c_str(), appVer);
+									}
+									if (access(appPath, F_OK) == 0)
+									{
+										break;
+									}
+								}
+								std_romsel_filename = appPath;
+							}
 							FILE *f_nds_file = fopen(std_romsel_filename.c_str(), "rb");
 							char game_TID[5];
 							grabTID(f_nds_file, game_TID);
@@ -984,6 +1005,7 @@ string browseForFile(const vector<string> extensionList, const char* username)
 				{
 					mmEffectEx(&snd_wrong);
 					clearText();
+					dbox_showIcon = true;
 					showdialogbox = true;
 					for (int i = 0; i < 30; i++) swiIntrWait(0, 1);
 					titleUpdate(dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).isDirectory, dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str(), cursorPosition[secondaryDevice]);
@@ -1007,9 +1029,43 @@ string browseForFile(const vector<string> extensionList, const char* username)
 					clearText();
 					showdialogbox = false;
 					for (int i = 0; i < 15; i++) swiIntrWait(0, 1);
+					dbox_showIcon = false;
 				}
 				else
 				{
+					bool hasAP = false;
+					if (!secondaryDevice
+					&& bnrRomType[cursorPosition[secondaryDevice]] == 0 && !isDSiWare[cursorPosition[secondaryDevice]]
+					&& isHomebrew[cursorPosition[secondaryDevice]] == 0)
+					{
+						FILE *f_nds_file = fopen(dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str(), "rb");
+						hasAP = checkRomAP(f_nds_file);
+						fclose(f_nds_file);
+					}
+					if (hasAP) {
+					clearText();
+					dbox_showIcon = true;
+					showdialogbox = true;
+					for (int i = 0; i < 30; i++) swiIntrWait(0, 1);
+					titleUpdate(dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).isDirectory, dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str(), cursorPosition[secondaryDevice]);
+					printSmallCentered(false, 64, "This game may not work correctly,");
+					printSmallCentered(false, 78, "if it's not AP-patched.");
+					printSmallCentered(false, 112, "If the game freezes, does not");
+					printSmallCentered(false, 126, "start, or doesn't seem normal,");
+					printSmallCentered(false, 140, "it needs to be AP-patched.");
+					printSmall(false, 208, 166, "A: OK");
+					pressed = 0;
+					do {
+						scanKeys();
+						pressed = keysDownRepeat();
+						swiIntrWait(0, 1);
+					} while (!(pressed & KEY_A));
+					clearText();
+					showdialogbox = false;
+					for (int i = 0; i < 20; i++) swiIntrWait(0, 1);
+					dbox_showIcon = false;
+					}
+
 					mmEffectEx(&snd_launch);
 					controlTopBright = true;
 					applaunch = true;
@@ -1154,9 +1210,11 @@ string browseForFile(const vector<string> extensionList, const char* username)
 			}
 
 			if ((pressed & KEY_X) && !startMenu && showbubble && showSTARTborder
-			&& strcmp(dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str(), "..") != 0)
+			&& strcmp(dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str(), "..") != 0
+			&& !isDirectory[cursorPosition[secondaryDevice]])
 			{
 				clearText();
+				dbox_showIcon = true;
 				showdialogbox = true;
 				for (int i = 0; i < 30; i++) swiIntrWait(0, 1);
 				snprintf (fileCounter, sizeof(fileCounter), "%i/%i", (cursorPosition[secondaryDevice]+1)+pagenum[secondaryDevice]*40, file_count);
@@ -1164,11 +1222,11 @@ string browseForFile(const vector<string> extensionList, const char* username)
 				printSmall(false, 16, 64, dirContents[scrn].at(cursorPosition[secondaryDevice]+pagenum[secondaryDevice]*40).name.c_str());
 				printSmall(false, 16, 166, fileCounter);
 				printSmallCentered(false, 112, "Are you sure you want to");
-				if (isDirectory[cursorPosition[secondaryDevice]]) {
-					printSmallCentered(false, 128, "delete this folder?");
-				} else {
+				//if (isDirectory[cursorPosition[secondaryDevice]]) {
+				//	printSmallCentered(false, 128, "delete this folder?");
+				//} else {
 					printSmallCentered(false, 128, "delete this game?");
-				}
+				//}
 				for (int i = 0; i < 90; i++) swiIntrWait(0, 1);
 				printSmall(false, 160, 166, "A: Yes");
 				printSmall(false, 208, 166, "B: No");
@@ -1204,6 +1262,7 @@ string browseForFile(const vector<string> extensionList, const char* username)
 				clearText();
 				showdialogbox = false;
 				for (int i = 0; i < 15; i++) swiIntrWait(0, 1);
+				dbox_showIcon = false;
 			}
 
 			if ((pressed & KEY_Y) && !startMenu
