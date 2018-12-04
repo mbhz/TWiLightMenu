@@ -444,9 +444,9 @@ void displayNowLoading(void) {
 		}
 	}
 	nowLoadingDisplaying = true;
-	for (int i = 0; i < 15; i++) swiIntrWait(0, 1);
+	for (int i = 0; i < 15; i++) swiWaitForVBlank();
 	reloadFontPalettes();
-	for (int i = 0; i < 20; i++) swiIntrWait(0, 1);
+	for (int i = 0; i < 20; i++) swiWaitForVBlank();
 	showProgressIcon = true;
 	controlTopBright = false;
 }
@@ -484,7 +484,7 @@ void launchSettings(void) {
 
 	SaveSettings();
 	// Launch settings
-	int err = runNdsFile ("/_nds/TWiLightMenu/main.srldr", 0, NULL, false, false, true, true);
+	int err = runNdsFile ("/_nds/TWiLightMenu/settings.srldr", 0, NULL, false, false, true, true);
 	iprintf ("Start failed. Error %i\n", err);
 }
 
